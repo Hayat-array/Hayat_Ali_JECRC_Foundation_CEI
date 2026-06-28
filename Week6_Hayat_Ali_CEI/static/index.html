@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN-ViT Image Denoiser | Neural Denoising Autoencoder</title>
+    <meta name="description" content="Interactive Hybrid CNN + Vision Transformer Autoencoder for real-time image denoising. Draw digits or upload any image to see AI denoising in action.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background ambience -->
+    <div class="bg-layer"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+
+    <div class="app-shell">
+
+        <!-- ===== HEADER ===== -->
+        <header class="site-header">
+            <div class="header-pill">CNN + ViT Hybrid Architecture</div>
+            <h1>Neural Image Denoiser</h1>
+            <p class="header-sub">Draw a digit, pick a MNIST preset, or upload your own image — the model strips Gaussian noise using CNN feature extraction &amp; Transformer attention</p>
+        </header>
+
+        <!-- ===== INPUT MODE TABS ===== -->
+        <div class="tab-bar">
+            <button class="tab-btn active" id="tab-draw" data-mode="draw">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
+                Draw Digit
+            </button>
+            <button class="tab-btn" id="tab-upload" data-mode="upload">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" fill="currentColor"/></svg>
+                Upload Image
+            </button>
+            <button class="tab-btn" id="tab-preset" data-mode="preset">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z" fill="currentColor"/></svg>
+                MNIST Presets
+            </button>
+        </div>
+
+        <!-- ===== WORKSPACE GRID ===== -->
+        <div class="workspace-grid">
+
+            <!-- LEFT: Input Panel -->
+            <aside class="panel input-panel">
+
+                <!-- DRAW MODE -->
+                <div class="input-mode" id="mode-draw">
+                    <div class="canvas-wrap">
+                        <canvas id="draw-canvas" width="280" height="280"></canvas>
+                    </div>
+                    <div class="canvas-toolbar">
+                        <button class="tool-btn active" id="tool-pen" title="Draw">
+                            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/></svg>
+                            Pen
+                        </button>
+                        <button class="tool-btn" id="tool-eraser" title="Erase">
+                            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73a2 2 0 0 0 0 2.83L5.03 20H20v-2h-9.38l8.97-8.97c.78-.78.78-2.05 0-2.83l-3.03-3.03a1.99 1.99 0 0 0-1.42-.17z" fill="currentColor"/></svg>
+                            Erase
+                        </button>
+                        <button class="tool-btn danger" id="tool-clear">Clear</button>
+                    </div>
+                    <div class="setting-row">
+                        <label>Brush Size</label>
+                        <input type="range" id="brush-size" min="8" max="36" step="2" value="18">
+                        <span class="setting-val" id="brush-label">18px</span>
+                    </div>
+                </div>
+
+                <!-- UPLOAD MODE -->
+                <div class="input-mode hidden" id="mode-upload">
+                    <div class="upload-zone" id="upload-zone">
+                        <input type="file" id="file-input" accept="image/*" hidden>
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24" width="48" height="48"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" fill="currentColor"/></svg>
+                        </div>
+                        <p class="upload-title">Drop image here or <button class="text-btn" id="browse-btn">browse</button></p>
+                        <p class="upload-hint">Any image format — converted to grayscale & processed at 28×28</p>
+                    </div>
+                    <div class="uploaded-preview hidden" id="upload-preview">
+                        <img id="preview-img" alt="Uploaded image preview">
+                        <button class="secondary-btn" id="remove-upload">
+                            <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/></svg>
+                            Remove
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PRESET MODE -->
+                <div class="input-mode hidden" id="mode-preset">
+                    <p class="mode-desc">Select a digit to load a random real MNIST test sample:</p>
+                    <div class="digit-grid">
+                        <button class="digit-btn" data-digit="0">0</button>
+                        <button class="digit-btn" data-digit="1">1</button>
+                        <button class="digit-btn" data-digit="2">2</button>
+                        <button class="digit-btn" data-digit="3">3</button>
+                        <button class="digit-btn" data-digit="4">4</button>
+                        <button class="digit-btn" data-digit="5">5</button>
+                        <button class="digit-btn" data-digit="6">6</button>
+                        <button class="digit-btn" data-digit="7">7</button>
+                        <button class="digit-btn" data-digit="8">8</button>
+                        <button class="digit-btn" data-digit="9">9</button>
+                    </div>
+                    <button class="secondary-btn full-w" id="btn-random">
+                        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" fill="currentColor"/></svg>
+                        Load Random
+                    </button>
+                    <div class="preset-preview-wrap hidden" id="preset-preview-wrap">
+                        <canvas id="preset-canvas" width="140" height="140"></canvas>
+                        <div class="preset-label font-mono" id="preset-label">digit: –</div>
+                    </div>
+                </div>
+
+                <!-- SHARED SETTINGS (always visible) -->
+                <div class="shared-settings">
+                    <div class="setting-row">
+                        <label>Gaussian Noise Factor (&eta;)</label>
+                        <input type="range" id="noise-factor" min="0.00" max="1.00" step="0.05" value="0.15">
+                        <span class="setting-val" id="noise-label">0.15</span>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="btn-denoise">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9.5 6.5v3h-3v2h3v3h2v-3h3v-2h-3v-3h-2zM11 1C5.48 1 1 5.48 1 11s4.48 10 10 10 10-4.48 10-10S16.52 1 11 1zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="currentColor"/></svg>
+                    <span>Run Denoising</span>
+                </button>
+            </aside>
+
+            <!-- RIGHT: Results Panel -->
+            <main class="panel results-panel" id="results-panel">
+
+                <!-- PLACEHOLDER when no result yet -->
+                <div class="placeholder-state" id="placeholder-state">
+                    <div class="placeholder-icon">
+                        <svg viewBox="0 0 24 24" width="56" height="56"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor" opacity="0.3"/></svg>
+                    </div>
+                    <h3>No results yet</h3>
+                    <p>Draw a digit, load an MNIST preset, or upload an image — then hit <strong>Run Denoising</strong></p>
+                </div>
+
+                <!-- ACTIVE RESULTS (hidden until first run) -->
+                <div class="active-results hidden" id="active-results">
+
+                    <!-- Full-res image comparison cards -->
+                    <div class="comparison-header">
+                        <h2>Denoising Results</h2>
+                        <span class="result-badge" id="result-badge">–</span>
+                    </div>
+
+                    <div class="image-compare-grid">
+                        <div class="img-card">
+                            <div class="img-card-label">Original (Clean)</div>
+                            <div class="img-card-body">
+                                <img id="out-clean" alt="Original clean image">
+                            </div>
+                        </div>
+                        <div class="img-card">
+                            <div class="img-card-label">Corrupted Input</div>
+                            <div class="img-card-body">
+                                <img id="out-noisy" alt="Corrupted noisy image">
+                            </div>
+                            <div class="img-card-sub" id="noisy-eta">η = 0.25</div>
+                        </div>
+                        <div class="img-card highlighted">
+                            <div class="img-card-label">Denoised Output</div>
+                            <div class="img-card-body">
+                                <img id="out-denoised" alt="Reconstructed denoised image">
+                            </div>
+                            <div class="img-card-sub glow-text">CNN-ViT Reconstruction</div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div class="metrics-section">
+                        <h3>Performance Metrics</h3>
+                        <div class="metrics-row">
+
+                            <div class="metric-card">
+                                <div class="metric-name">PSNR</div>
+                                <div class="metric-subtitle">Peak Signal-to-Noise Ratio</div>
+                                <div class="metric-main">
+                                    <span class="metric-num font-mono" id="m-psnr">--</span>
+                                    <span class="metric-unit">dB</span>
+                                </div>
+                                <div class="metric-bar"><div class="metric-fill psnr-fill" id="bar-psnr"></div></div>
+                                <div class="metric-tip">Higher is better. ≥ 19 dB is excellent.</div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-name">SSIM</div>
+                                <div class="metric-subtitle">Structural Similarity Index</div>
+                                <div class="metric-main">
+                                    <span class="metric-num font-mono" id="m-ssim">--</span>
+                                    <span class="metric-unit">index</span>
+                                </div>
+                                <div class="metric-bar"><div class="metric-fill ssim-fill" id="bar-ssim"></div></div>
+                                <div class="metric-tip">Range 0–1. Closer to 1.0 is perfect.</div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-name">MSE</div>
+                                <div class="metric-subtitle">Mean Squared Error</div>
+                                <div class="metric-main">
+                                    <span class="metric-num font-mono" id="m-mse">--</span>
+                                </div>
+                                <div class="metric-bar inverse"><div class="metric-fill mse-fill" id="bar-mse"></div></div>
+                                <div class="metric-tip">Lower is better. ≤ 0.012 is target.</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- ARCHITECTURE FOOTER -->
+        <footer class="arch-footer">
+            <div class="arch-card">
+                <h4>CNN Encoder</h4>
+                <p>3 stages with ResNet blocks: 28×28×1 → 7×7×128. Captures local structural & edge features via spatial convolutions.</p>
+            </div>
+            <div class="arch-card">
+                <h4>ViT Bottleneck</h4>
+                <p>7×7 spatial map → 49 tokens. 2 transformer layers with 4-head self-attention learn global coherence constraints.</p>
+            </div>
+            <div class="arch-card">
+                <h4>CNN Decoder</h4>
+                <p>Conv2DTranspose upsamples with skip connections from encoder stages to preserve fine-grained details.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loader-card">
+            <div class="loader-spinner"></div>
+            <div class="loader-text" id="loader-text">Running neural denoising pipeline...</div>
+            <div class="loader-sub">CNN → ViT Attention → Decoder</div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
